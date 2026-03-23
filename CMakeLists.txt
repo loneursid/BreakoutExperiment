@@ -76,6 +76,9 @@ target_link_libraries(breakout_bdd PRIVATE
 )
 target_include_directories(breakout_bdd PRIVATE src bdd)
 
+# ── Test discovery ────────────────────────────────────────────────────────────
 enable_testing()
+include(CTest)
+
 add_test(NAME unit_tests COMMAND breakout_tests)
 add_test(NAME bdd_tests  COMMAND breakout_bdd)

@@ -7,7 +7,6 @@ vcpkg_installed/
 
 # Visual Studio
 .vs/
-CMakeSettings.json
 *.user
 *.suo
 *.aps
