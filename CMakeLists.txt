@@ -13,6 +13,7 @@ endif()
 
 # ── Dependencies via vcpkg ────────────────────────────────────────────────────
 find_package(raylib CONFIG REQUIRED)
+find_package(Catch2 CONFIG REQUIRED)
 
 # ── Source files shared by game + headless targets ───────────────────────────
 set(GAME_SOURCES
@@ -33,7 +34,7 @@ add_executable(breakout
 target_link_libraries(breakout PRIVATE raylib)
 target_include_directories(breakout PRIVATE src)
 
-# ── Headless logic library (for tests) ───────────────────────────────────────
+# ── Headless logic library (shared by both test targets) ─────────────────────
 add_library(breakout_logic STATIC ${GAME_SOURCES})
 target_include_directories(breakout_logic PUBLIC src)
 target_compile_definitions(breakout_logic PUBLIC BREAKOUT_HEADLESS)
@@ -59,33 +60,22 @@ add_executable(breakout_tests
 target_link_libraries(breakout_tests PRIVATE breakout_logic doctest::doctest)
 target_include_directories(breakout_tests PRIVATE src)
 
+# ── Catch2 BDD feature tests ──────────────────────────────────────────────────
+add_executable(breakout_bdd
+    bdd/bdd_startup.cpp
+    bdd/bdd_paddle.cpp
+    bdd/bdd_ball.cpp
+    bdd/bdd_bricks.cpp
+    bdd/bdd_collision.cpp
+    bdd/bdd_scoring.cpp
+    bdd/bdd_game_states.cpp
+)
+target_link_libraries(breakout_bdd PRIVATE
+    breakout_logic
+    Catch2::Catch2WithMain
+)
+target_include_directories(breakout_bdd PRIVATE src bdd)
+
 enable_testing()
 add_test(NAME unit_tests COMMAND breakout_tests)
-
-# ── BDD cucumber-cpp tests ────────────────────────────────────────────────────
-# cucumber-cpp is not in vcpkg. To enable the BDD target, build cucumber-cpp
-# manually and set CucumberCpp_DIR to its cmake install prefix, then re-run cmake.
-# The .feature files in features/ remain the authoritative acceptance spec.
-find_package(CucumberCpp CONFIG QUIET)
-find_package(Boost QUIET COMPONENTS unit_test_framework)
-
-if(CucumberCpp_FOUND AND Boost_FOUND)
-    add_executable(breakout_bdd
-        features/step_definitions/startup_steps.cpp
-        features/step_definitions/paddle_steps.cpp
-        features/step_definitions/ball_steps.cpp
-        features/step_definitions/brick_steps.cpp
-        features/step_definitions/collision_steps.cpp
-        features/step_definitions/scoring_steps.cpp
-        features/step_definitions/game_state_steps.cpp
-    )
-    target_link_libraries(breakout_bdd PRIVATE
-        breakout_logic
-        CucumberCpp::cucumber-cpp
-        Boost::unit_test_framework
-    )
-    target_include_directories(breakout_bdd PRIVATE src features/step_definitions)
-    add_test(NAME bdd_tests COMMAND breakout_bdd)
-else()
-    message(STATUS "cucumber-cpp not found — BDD target skipped (unit tests cover all ACs)")
-endif()
+add_test(NAME bdd_tests  COMMAND breakout_bdd)
