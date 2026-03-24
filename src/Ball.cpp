@@ -21,6 +21,8 @@ void Ball::reset()
 
 void Ball::update(float dt)
 {
+    m_wallHit = false;
+
     m_pos.x += m_vel.x * dt;
     m_pos.y += m_vel.y * dt;
 
@@ -28,16 +30,21 @@ void Ball::update(float dt)
     if (m_pos.x - m_radius <= 0.0f && m_vel.x < 0.0f) {
         m_pos.x = m_radius;
         reflectX();
+        m_wallHit = true;
     }
     if (m_pos.x + m_radius >= static_cast<float>(SCREEN_WIDTH) && m_vel.x > 0.0f) {
         m_pos.x = static_cast<float>(SCREEN_WIDTH) - m_radius;
         reflectX();
+        m_wallHit = true;
     }
     if (m_pos.y - m_radius <= 0.0f && m_vel.y < 0.0f) {
         m_pos.y = m_radius;
         reflectY();
+        m_wallHit = true;
     }
 }
+
+bool Ball::wallHitOccurred() const { return m_wallHit; }
 
 void Ball::setPosition(Vector2 pos) { m_pos = pos; }
 void Ball::setVelocity(Vector2 vel) { m_vel = vel; }

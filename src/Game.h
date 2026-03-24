@@ -5,6 +5,7 @@
 #include "Paddle.h"
 #include "Brick.h"
 #include "ScoreManager.h"
+#include "AudioManager.h"
 
 enum class GameState { START, PLAYING, GAME_OVER, WIN };
 
@@ -18,11 +19,12 @@ public:
     void handleInput();
 
     // State accessors for Renderer / tests
-    GameState             getState()       const;
-    const Ball&           getBall()        const;
-    const Paddle&         getPaddle()      const;
-    const std::vector<Brick>& getBricks()  const;
-    const ScoreManager&   getScoreManager() const;
+    GameState                 getState()          const;
+    const Ball&               getBall()           const;
+    const Paddle&             getPaddle()         const;
+    const std::vector<Brick>& getBricks()         const;
+    const ScoreManager&       getScoreManager()   const;
+    const AudioManager&       getAudioManager()   const;
 
     // Returns how many bricks are still active
     int activeBrickCount() const;
@@ -39,10 +41,12 @@ private:
     virtual bool isRightPressed()   const;
     virtual bool isSpacePressed()   const;
     virtual bool isRestartPressed() const;
+    virtual bool isMutePressed()    const;
 
     GameState           m_state;
     Ball                m_ball;
     Paddle              m_paddle;
     std::vector<Brick>  m_bricks;
     ScoreManager        m_score;
+    AudioManager        m_audio;
 };

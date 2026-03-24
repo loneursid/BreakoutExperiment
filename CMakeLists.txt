@@ -22,6 +22,7 @@ set(GAME_SOURCES
     src/Brick.cpp
     src/CollisionDetector.cpp
     src/ScoreManager.cpp
+    src/AudioManager.cpp
     src/Game.cpp
 )
 
@@ -56,6 +57,7 @@ add_executable(breakout_tests
     tests/test_collision_detector.cpp
     tests/test_score_manager.cpp
     tests/test_game_state.cpp
+    tests/test_audio_manager.cpp
 )
 target_link_libraries(breakout_tests PRIVATE breakout_logic doctest::doctest)
 target_include_directories(breakout_tests PRIVATE src)
@@ -69,6 +71,7 @@ add_executable(breakout_bdd
     bdd/bdd_collision.cpp
     bdd/bdd_scoring.cpp
     bdd/bdd_game_states.cpp
+    bdd/bdd_audio.cpp
 )
 target_link_libraries(breakout_bdd PRIVATE
     breakout_logic

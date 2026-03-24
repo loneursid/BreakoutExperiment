@@ -11,6 +11,7 @@ public:
     bool isRightPressed()   const override { return right;   }
     bool isSpacePressed()   const override { return space;   }
     bool isRestartPressed() const override { return restart; }
+    bool isMutePressed()    const override { return false;   }
 };
 
 // AC-01-b / AC-01-d: starts in START, SPACE transitions to PLAYING

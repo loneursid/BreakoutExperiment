@@ -42,6 +42,11 @@ void Renderer::drawPlaying(const Game& game)
     // Score
     DrawText(game.getScoreManager().getFormattedScore().c_str(), 10, 10, 20, WHITE);
 
+    // Mute label (top-right)
+    const std::string muteLabel = game.getAudioManager().getMuteLabel();
+    int labelW = MeasureText(muteLabel.c_str(), 18);
+    DrawText(muteLabel.c_str(), SCREEN_WIDTH - labelW - 10, 10, 18, GRAY);
+
     // Paddle
     const Paddle& p = game.getPaddle();
     DrawRectF(p.getX(), p.getY(), p.getWidth(), p.getHeight(), LIGHTGRAY);

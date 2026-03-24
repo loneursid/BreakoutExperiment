@@ -33,6 +33,7 @@ breakout/
 │   ├── CollisionDetector.h / .cpp   # AABB and circle-vs-rect logic
 │   ├── ScoreManager.h / .cpp        # Score tracking and formatting
 │   ├── Renderer.h / .cpp            # All raylib draw calls
+│   ├── AudioManager.h / .cpp        # Procedural sound generation and playback
 │   └── Constants.h                  # All magic numbers in one place
 ├── features/                        # *** IMMUTABLE — owned by product owner ***
 │   ├── step_definitions/            # C++ step wiring (Claude Code may add, never delete)
@@ -42,7 +43,8 @@ breakout/
 │   │   ├── brick_steps.cpp
 │   │   ├── collision_steps.cpp
 │   │   ├── scoring_steps.cpp
-│   │   └── game_state_steps.cpp
+│   │   ├── game_state_steps.cpp
+│   │   └── audio_steps.cpp
 │   ├── startup.feature
 │   ├── paddle.feature
 │   ├── ball.feature
@@ -51,7 +53,8 @@ breakout/
 │   ├── scoring.feature
 │   ├── game_over.feature
 │   ├── win_condition.feature
-│   └── code_quality.feature
+│   ├── code_quality.feature
+│   └── audio.feature
 ├── tests/                           # TDD unit tests — owned by Claude Code
 │   ├── CMakeLists.txt
 │   ├── test_main.cpp
@@ -60,7 +63,8 @@ breakout/
 │   ├── test_brick.cpp
 │   ├── test_collision_detector.cpp
 │   ├── test_score_manager.cpp
-│   └── test_game_state.cpp
+│   ├── test_game_state.cpp
+│   └── test_audio_manager.cpp
 └── assets/                          # Reserved for future assets
 ```
 
@@ -490,6 +494,7 @@ Each class has one reason to change:
 - `CollisionDetector` — owns all AABB and circle-vs-rect collision logic (extracted from Game)
 - `ScoreManager` — owns score tracking and formatting (extracted from Game)
 - `Renderer` — owns all DrawText / DrawRectangle / DrawCircle calls (extracted from Game)
+- `AudioManager` — owns all sound generation, playback, and mute state (extracted from Game)
 
 ### Open/Closed Principle
 - Game state transitions should be driven by the state enum, not by chains of if/else that must be edited to add new states
@@ -544,6 +549,194 @@ Each class has one reason to change:
 - Multiple levels
 - Lives system (ball lost = immediate game over)
 - Power-ups
-- Sound effects or music
+- Background music
 - High score persistence
 - Mouse control for paddle
+
+---
+
+## Audio Specification (v1.1)
+
+### Approach
+All sounds are generated **procedurally at runtime** using raylib's audio API (`LoadSoundFromWave`).
+No audio files are shipped with the game — all waveforms are synthesised in code.
+This keeps the repo clean and satisfies the SOLID principle by isolating all audio
+generation and playback behind a dedicated `AudioManager` class.
+
+### AudioManager Class
+- Owns all sound generation, storage, and playback
+- Initialises raylib audio device on construction (`InitAudioDevice`)
+- Closes audio device on destruction (`CloseAudioDevice`)
+- Exposes named play methods: `playPaddleHit()`, `playWallHit()`, `playBrickHit()`, `playBallLost()`, `playWin()`
+- Owns a mute flag toggled by the M key — when muted, play methods are no-ops
+- Displays mute state on screen: "M: Mute" or "M: Unmute" in the HUD
+- No other class calls raylib audio functions directly
+
+### Sound Design
+All sounds are short synthesised tones generated from raw PCM waveforms:
+
+| Event | Character | Suggested frequency | Duration |
+|---|---|---|---|
+| Ball hits paddle | Mid thump | ~180 Hz sine | ~80ms |
+| Ball hits wall | High bing | ~440 Hz sine | ~60ms |
+| Ball destroys brick | Crisp ding | ~600 Hz sine, fast decay | ~50ms |
+| Ball exits bottom | Low dull thud | ~90 Hz sine | ~120ms |
+| Win condition | Rising tone | ~523→1047 Hz sweep | ~400ms |
+
+Claude Code has latitude to tune frequencies and durations for best game feel,
+provided the character described above is preserved and all AC criteria pass.
+
+### Updated Project Structure (audio additions)
+```
+src/
+├── AudioManager.h / AudioManager.cpp    # NEW — all audio logic
+tests/
+├── test_audio_manager.cpp               # NEW — mute logic, state tests
+features/
+├── audio.feature                        # NEW — IMMUTABLE
+├── step_definitions/
+│   └── audio_steps.cpp                  # NEW
+```
+
+---
+
+## Acceptance Criteria — Audio (AC-10)
+
+### AC-10-a: Audio initialisation
+- **Given** the game executable is launched
+- **When** the AudioManager is constructed
+- **Then** the raylib audio device is successfully initialised with no errors
+- **And** all five sounds are generated and ready to play
+
+### AC-10-b: Ball hits paddle
+- **Given** the game is in PLAYING state and audio is not muted
+- **When** the ball's bounding circle collides with the paddle
+- **Then** the paddle hit sound plays exactly once per collision
+
+### AC-10-c: Ball hits wall
+- **Given** the game is in PLAYING state and audio is not muted
+- **When** the ball reflects off the left, right, or top wall
+- **Then** the wall hit sound plays exactly once per reflection
+
+### AC-10-d: Ball destroys brick
+- **Given** the game is in PLAYING state and audio is not muted
+- **When** the ball collides with and destroys a brick
+- **Then** the brick hit sound plays exactly once for that collision
+
+### AC-10-e: Ball exits bottom
+- **Given** the game is in PLAYING state and audio is not muted
+- **When** the ball's bottom edge exits the screen at the bottom
+- **Then** the ball lost sound plays once before transitioning to GAME_OVER state
+
+### AC-10-f: Win condition sound
+- **Given** the last brick has been destroyed and audio is not muted
+- **When** the game transitions to WIN state
+- **Then** the win sound plays once
+
+### AC-10-g: Mute toggle — muting
+- **Given** the game is in any state and audio is currently unmuted
+- **When** the player presses the M key
+- **Then** the mute flag is set to true
+- **And** the HUD updates to show "M: Unmute"
+- **And** no further sounds play until unmuted
+
+### AC-10-h: Mute toggle — unmuting
+- **Given** the game is in any state and audio is currently muted
+- **When** the player presses the M key
+- **Then** the mute flag is set to false
+- **And** the HUD updates to show "M: Mute"
+- **And** sounds resume playing on the next triggering event
+
+### AC-10-i: Mute persists across game states
+- **Given** the player has muted audio during PLAYING state
+- **When** the game transitions to GAME_OVER or WIN state and back to START
+- **Then** the mute flag remains true across all state transitions
+
+### AC-10-j: No sound when muted
+- **Given** the mute flag is true
+- **When** any collision or game state event occurs that would normally trigger a sound
+- **Then** no sound plays
+
+### AC-10-k: Single sound per event
+- **Given** the game is in PLAYING state and audio is not muted
+- **When** a single collision event is detected
+- **Then** exactly one sound plays — sounds do not stack or double-trigger on the same event
+
+---
+
+## Feature File — audio.feature
+```gherkin
+# features/audio.feature
+# IMMUTABLE - Product Owner approved
+# Version: 1.1
+
+Feature: Audio feedback
+  As a player
+  I want audio feedback for game events
+  So that the game feels responsive and satisfying
+
+  Scenario: Audio initialises successfully (AC-10-a)
+    Given the game executable is launched
+    When the AudioManager is constructed
+    Then the audio device is initialised without errors
+    And all five sounds are ready to play
+
+  Scenario: Paddle hit plays sound (AC-10-b)
+    Given the game is in PLAYING state
+    And audio is not muted
+    When the ball collides with the paddle
+    Then the paddle hit sound plays exactly once
+
+  Scenario: Wall hit plays sound (AC-10-c)
+    Given the game is in PLAYING state
+    And audio is not muted
+    When the ball reflects off a wall
+    Then the wall hit sound plays exactly once
+
+  Scenario: Brick destruction plays sound (AC-10-d)
+    Given the game is in PLAYING state
+    And audio is not muted
+    When the ball destroys a brick
+    Then the brick hit sound plays exactly once
+
+  Scenario: Ball lost plays sound (AC-10-e)
+    Given the game is in PLAYING state
+    And audio is not muted
+    When the ball exits the bottom of the screen
+    Then the ball lost sound plays once
+
+  Scenario: Win condition plays sound (AC-10-f)
+    Given the last brick has been destroyed
+    And audio is not muted
+    When the game transitions to WIN state
+    Then the win sound plays once
+
+  Scenario: M key mutes audio (AC-10-g)
+    Given audio is currently unmuted
+    When the player presses the M key
+    Then the mute flag is true
+    And the HUD displays "M: Unmute"
+
+  Scenario: M key unmutes audio (AC-10-h)
+    Given audio is currently muted
+    When the player presses the M key
+    Then the mute flag is false
+    And the HUD displays "M: Mute"
+
+  Scenario: Mute persists across game states (AC-10-i)
+    Given the player has muted audio during PLAYING state
+    When the game transitions to GAME_OVER state
+    And the player restarts and enters PLAYING state
+    Then the mute flag is still true
+
+  Scenario: No sound plays when muted (AC-10-j)
+    Given the mute flag is true
+    When any collision or game state event occurs
+    Then no sound plays
+
+  Scenario: Single sound per collision event (AC-10-k)
+    Given the game is in PLAYING state
+    And audio is not muted
+    When a single collision event is detected
+    Then exactly one sound plays for that event
+```

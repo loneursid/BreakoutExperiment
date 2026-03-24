@@ -19,8 +19,12 @@ public:
     void reflectX();
     void reflectY();
 
+    // True if a wall reflection occurred during the last update() call
+    bool wallHitOccurred() const;
+
 private:
     Vector2 m_pos;
     Vector2 m_vel;
     float   m_radius;
+    bool    m_wallHit = false;
 };

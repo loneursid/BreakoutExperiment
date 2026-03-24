@@ -37,6 +37,9 @@ void Game::initBricks()
 
 void Game::handleInput()
 {
+    // Mute toggle available in all states
+    if (isMutePressed()) m_audio.toggleMute();
+
     switch (m_state) {
     case GameState::START:
         if (isSpacePressed()) {
@@ -47,7 +50,7 @@ void Game::handleInput()
         break;
 
     case GameState::PLAYING:
-        // Paddle movement is handled in update() with real dt
+        // Paddle movement handled in update() with real dt
         break;
 
     case GameState::GAME_OVER:
@@ -65,16 +68,19 @@ void Game::update(float dt)
     if (isRightPressed()) m_paddle.moveRight(dt);
 
     m_ball.update(dt);
+    if (m_ball.wallHitOccurred()) m_audio.playWallHit();
     processCollisions();
 
     // Win check
     if (activeBrickCount() == 0) {
+        m_audio.playWin();
         m_state = GameState::WIN;
         return;
     }
 
     // Game over check
     if (CollisionDetector::ballExitedBottom(m_ball, static_cast<float>(SCREEN_HEIGHT))) {
+        m_audio.playBallLost();
         m_state = GameState::GAME_OVER;
     }
 }
@@ -85,20 +91,17 @@ void Game::processCollisions()
     CollisionAxis axis = CollisionDetector::ballVsPaddle(m_ball, m_paddle);
     if (axis == CollisionAxis::Y && m_ball.getVelocity().y > 0.0f) {
         m_ball.reflectY();
+        m_audio.playPaddleHit();
 
-        // Optional: adjust X velocity based on hit offset from paddle centre
+        // Adjust X velocity based on hit offset from paddle centre
         float paddleCentreX = m_paddle.getX() + m_paddle.getWidth() / 2.0f;
         float offset = (m_ball.getPosition().x - paddleCentreX) / (m_paddle.getWidth() / 2.0f);
         Vector2 vel = m_ball.getVelocity();
         vel.x = BALL_SPEED * offset;
-        // Keep speed constant
-        float speed = m_ball.getSpeed();
-        if (speed > 0.0f) {
-            vel.x = vel.x;  // already set
-        }
         m_ball.setVelocity(vel);
     } else if (axis == CollisionAxis::X) {
         m_ball.reflectX();
+        m_audio.playPaddleHit();
     }
 
     // Ball vs bricks
@@ -109,11 +112,13 @@ void Game::processCollisions()
 
         brick.hit();
         m_score.addBrickScore();
+        m_audio.playBrickHit();
 
         if (bAxis == CollisionAxis::X) m_ball.reflectX();
         else                            m_ball.reflectY();
         break; // handle one brick per frame to avoid tunnelling artefacts
     }
+
 }
 
 void Game::reset()
@@ -123,13 +128,15 @@ void Game::reset()
     m_paddle.reset();
     m_score.reset();
     initBricks();
+    // m_audio mute state intentionally preserved across resets (AC-10-i)
 }
 
-GameState             Game::getState()        const { return m_state; }
-const Ball&           Game::getBall()         const { return m_ball; }
-const Paddle&         Game::getPaddle()       const { return m_paddle; }
-const std::vector<Brick>& Game::getBricks()   const { return m_bricks; }
-const ScoreManager&   Game::getScoreManager() const { return m_score; }
+GameState                 Game::getState()          const { return m_state; }
+const Ball&               Game::getBall()           const { return m_ball; }
+const Paddle&             Game::getPaddle()         const { return m_paddle; }
+const std::vector<Brick>& Game::getBricks()         const { return m_bricks; }
+const ScoreManager&       Game::getScoreManager()   const { return m_score; }
+const AudioManager&       Game::getAudioManager()   const { return m_audio; }
 
 int Game::activeBrickCount() const
 {
@@ -138,16 +145,18 @@ int Game::activeBrickCount() const
     return count;
 }
 
-// ---- Input (real raylib implementation) ----
+// ── Input — real raylib implementation ───────────────────────────────────────
 #ifndef BREAKOUT_HEADLESS
 bool Game::isLeftPressed()    const { return IsKeyDown(KEY_LEFT)  || IsKeyDown(KEY_A); }
 bool Game::isRightPressed()   const { return IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D); }
 bool Game::isSpacePressed()   const { return IsKeyPressed(KEY_SPACE); }
 bool Game::isRestartPressed() const { return IsKeyPressed(KEY_R); }
+bool Game::isMutePressed()    const { return IsKeyPressed(KEY_M); }
 #else
 // Headless stubs — overridden in tests / BDD
 bool Game::isLeftPressed()    const { return false; }
 bool Game::isRightPressed()   const { return false; }
 bool Game::isSpacePressed()   const { return false; }
 bool Game::isRestartPressed() const { return false; }
+bool Game::isMutePressed()    const { return false; }
 #endif
